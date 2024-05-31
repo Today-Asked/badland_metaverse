@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecology</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.1/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.1/dist/leaflet.markercluster.js"></script>
+    <style>
+      button {
+        background: none!important;
+        border: none;
+        padding: 0!important;
+        /*optional*/
+        font-family: arial, sans-serif;
+        /*input has OS specific font-family*/
+        color: #069;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+    </style>
+    
+    <script>
+      //JSON data, points, pointsNumber      
+      function getClosestNMarker(latlng, geoJson, pointNum) {
+        console.log(geoJson);
+        console.log(geoJson.features);
+        // 從 GeoJSON 物件中取得所有的標記點
+        var markers = geoJson.features.map(function(feature) {
+          return L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]);
+        });
+        console.log("finished getting markers");
+
+        // 從 GeoJSON 物件中取得所有的標記點
+        var markers = geoJson.features.map(function(feature) {
+          return {
+            marker: L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]),
+            latlng: L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0])
+          };
+        });
+
+        console.log("finished getting markers");
+        // 將所有的標記點與給定的點計算距離，並存入一個新的陣列
+        var distances = markers.map(function(markerObj) {
+          return {
+            marker: markerObj.marker,
+            distance: latlng.distanceTo(markerObj.latlng)
+          };
+        });
+        // 將這個陣列按照距離由小到大排序
+        distances.sort(function(a, b) {
+          return a.distance - b.distance;
+        });
+
+        // 取出距離最小的n個點，並確保它們的距離不超過max_distance
+        var closestPoints = [];
+        for (var i = 0; i < distances.length && closestPoints.length < pointNum; i++) {
+          closestPoints.push(distances[i].marker);
+        }
+
+        var isMarker = closestPoints[0] instanceof L.Marker;
+        console.log(isMarker);
+        return closestPoints;
+      }
+
+      
+      function external_link(button){
+        var buttonText = button.innerText;
+        var url = "https://sites.google.com/view/zjmetaverse/物種圖鑑/" + buttonText;
+        window.open(url, "_blank");
+      }
+
+      function handleJSONdata(bird){          
+          console.log("Received data:", bird);
+
+          bird_geo=L.geoJSON(bird,{
+              onEachFeature:(feature,layer)=>{
+                layer.bindPopup(
+                  '<b>物種名稱： <button onclick="external_link(this)">' + feature.properties['Sp.'] + '</button></b><br>'
+                  + '<img src=' +  bird_url[feature.properties['Sp.']]+ ">"
+                )
+              }
+            })
+          let markersCluster = L.markerClusterGroup().addLayer(bird_geo).addTo(map);
+
+          //spider-map
+          let multipolyline = L.polyline([])
+          multipolyline.setStyle({
+            color: '#717f6b'
+          })
+          map.on('move', function(e){
+            multipolyline.remove()
+            let latlang_N=[]
+            let latlng = map.getCenter(); // 取得點擊事件的位置            // 尋找最近的8隻東西            var closestMarker = getClosestNMarker(latlng, bird, 8);
+            if (closestMarker) {
+              // 在兩點間創造一個線段
+              for(let i=0;i<closestMarker.length;i++){
+              latlang_N.push([closestMarker[i].getLatLng(),latlng])};
+            }
+            multipolyline = L.polyline(latlang_N).addTo(map)
+          })
+        }
+
+        map = L.map('map').setView([23.013309517678845, 120.4167566997621], 13);
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 17,
+              attribution: '© OpenStreetMap'
+        }).addTo(map);
+        google.script.run.withSuccessHandler(handleJSONdata).getJSONdata(); //retrive points of animals
+    </script>
+</head>
+<body>
+  <!--
+    To do:
+    - 抓取 csv 檔
+    - spider map
+  -->
+    <div id="map" style="height: 100vh; width: 100vw">
+      <script>
+        bird_url = {'斑文鳥':"https://hackmd.io/_uploads/SJppeprN0.jpg"}
+      </script>
+    </div>
+
+</body>
+</html>
