@@ -22,50 +22,62 @@
         cursor: pointer;
       }
 
+      body{
+        width: 100%;
+        height: 100%;
+      }
+      /*hide scroll bar*/
+      *{
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
     </style>
     
     <script>
-      //JSON data, points, pointsNumber      
-      function getClosestNMarker(latlng, geoJson, pointNum) {
-        console.log(geoJson);
-        console.log(geoJson.features);
-        // 從 GeoJSON 物件中取得所有的標記點
-        var markers = geoJson.features.map(function(feature) {
-          return L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]);
-        });
-        console.log("finished getting markers");
+      //JSON data, points, pointsNumber
+      // function getClosestNMarker(latlng, geoJson, pointNum) {
+      //   console.log(geoJson);
+      //   console.log(geoJson.features);
+      //   // 從 GeoJSON 物件中取得所有的標記點
+      //   var markers = geoJson.features.map(function(feature) {
+      //     return L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]);
+      //   });
+      //   console.log("finished getting markers");
 
-        // 從 GeoJSON 物件中取得所有的標記點
-        var markers = geoJson.features.map(function(feature) {
-          return {
-            marker: L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]),
-            latlng: L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0])
-          };
-        });
+      //   // 從 GeoJSON 物件中取得所有的標記點
+      //   var markers = geoJson.features.map(function(feature) {
+      //     return {
+      //       marker: L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]),
+      //       latlng: L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0])
+      //     };
+      //   });
 
-        console.log("finished getting markers");
-        // 將所有的標記點與給定的點計算距離，並存入一個新的陣列
-        var distances = markers.map(function(markerObj) {
-          return {
-            marker: markerObj.marker,
-            distance: latlng.distanceTo(markerObj.latlng)
-          };
-        });
-        // 將這個陣列按照距離由小到大排序
-        distances.sort(function(a, b) {
-          return a.distance - b.distance;
-        });
+      //   console.log("finished getting markers");
+      //   // 將所有的標記點與給定的點計算距離，並存入一個新的陣列
+      //   var distances = markers.map(function(markerObj) {
+      //     return {
+      //       marker: markerObj.marker,
+      //       distance: latlng.distanceTo(markerObj.latlng)
+      //     };
+      //   });
+      //   // 將這個陣列按照距離由小到大排序
+      //   distances.sort(function(a, b) {
+      //     return a.distance - b.distance;
+      //   });
 
-        // 取出距離最小的n個點，並確保它們的距離不超過max_distance
-        var closestPoints = [];
-        for (var i = 0; i < distances.length && closestPoints.length < pointNum; i++) {
-          closestPoints.push(distances[i].marker);
-        }
+      //   // 取出距離最小的n個點，並確保它們的距離不超過max_distance
+      //   var closestPoints = [];
+      //   for (var i = 0; i < distances.length && closestPoints.length < pointNum; i++) {
+      //     closestPoints.push(distances[i].marker);
+      //   }
 
-        var isMarker = closestPoints[0] instanceof L.Marker;
-        console.log(isMarker);
-        return closestPoints;
-      }
+      //   var isMarker = closestPoints[0] instanceof L.Marker;
+      //   console.log(isMarker);
+      //   return closestPoints;
+      // }
 
       
       function external_link(button){
@@ -74,54 +86,74 @@
         window.open(url, "_blank");
       }
 
-      function handleJSONdata(bird){          
-          console.log("Received data:", bird);
+      var total_bird = {
+        "type": "FeatureCollection",
+        "features": []
+      };
+
+      var counter = 0;
+      function collectData(bird){
+        console.log(bird)
+        if (bird == null) return; 
+        total_bird['features'] = total_bird['features'].concat(bird);
+      }
+
+
+      function handleJSONdata(bird){
+        console.log("Received data:", bird);
 
           bird_geo=L.geoJSON(bird,{
               onEachFeature:(feature,layer)=>{
                 layer.bindPopup(
                   '<b>物種名稱： <button onclick="external_link(this)">' + feature.properties['Sp.'] + '</button></b><br>'
-                  + '<img src=' +  bird_url[feature.properties['Sp.']]+ ">"
+                  + '<img src=' +  bird_url[feature.properties['Sp.']]+ " width=200>"
                 )
               }
             })
           let markersCluster = L.markerClusterGroup().addLayer(bird_geo).addTo(map);
+          console.log("add points to map");
+      }
 
-          //spider-map
-          let multipolyline = L.polyline([])
-          multipolyline.setStyle({
-            color: '#717f6b'
-          })
-          map.on('move', function(e){
-            multipolyline.remove()
-            let latlang_N=[]
-            let latlng = map.getCenter(); // 取得點擊事件的位置            // 尋找最近的8隻東西            var closestMarker = getClosestNMarker(latlng, bird, 8);
-            if (closestMarker) {
-              // 在兩點間創造一個線段
-              for(let i=0;i<closestMarker.length;i++){
-              latlang_N.push([closestMarker[i].getLatLng(),latlng])};
-            }
-            multipolyline = L.polyline(latlang_N).addTo(map)
-          })
-        }
-
+      (async function (){
+            const await_addData = async () => {
+                let promises = [];
+                for (let i = 0; i < 20; i++) {
+                  promises.push(new Promise((resolve) => {
+                    google.script.run.withSuccessHandler((result) => {
+                        const collectedData = collectData(result);
+                        resolve(collectedData);
+                    }).getJSONdataInBatch(i);
+                  }));
+                }
+                // 等待所有的Promise都被解决
+                const results = await Promise.all(promises);
+                console.log("finish addData()s "+results);
+                // 合并所有批次的数据
+                return results.flat();
+            };
+            const testing = await await_addData();
+            handleJSONdata(total_bird);
+      })()
+      
+        
+    </script>
+</head>
+<body>
+    <div id="map" style="height: 100vh; width: 100vw">
+      <script>
+        //創建地圖
         map = L.map('map').setView([23.013309517678845, 120.4167566997621], 13);
           L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
               maxZoom: 17,
               attribution: '© OpenStreetMap'
-        }).addTo(map);
-        google.script.run.withSuccessHandler(handleJSONdata).getJSONdata(); //retrive points of animals
-    </script>
-</head>
-<body>
-  <!--
-    To do:
-    - 抓取 csv 檔
-    - spider map
-  -->
-    <div id="map" style="height: 100vh; width: 100vw">
-      <script>
-        bird_url = {'斑文鳥':"https://hackmd.io/_uploads/SJppeprN0.jpg"}
+          }).addTo(map);
+        console.log("create map");
+
+        bird_url = {'斑文鳥':"https://hackmd.io/_uploads/BJBenlDN0.jpg",
+                    '大卷尾':'https://hackmd.io/_uploads/ryrx2lPVR.jpg',
+                    '小彎嘴':'https://hackmd.io/_uploads/ryrxngPVR.jpg',
+                    '白頭翁':'https://hackmd.io/_uploads/HyAb3xDVR.jpg',
+                    '紅鳩':'https://hackmd.io/_uploads/ryBgnlPEA.jpg'}
       </script>
     </div>
 
